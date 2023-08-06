@@ -256,7 +256,7 @@ control MyEgress(inout headers hdr,
         tmp = (ingress_global_timestamp_v)standard_metadata.ingress_global_timestamp;
         //hdr.INT[0].egress_global_timestamp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
         tmp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
-        hdr.INT[0].enq_timestamp = (enq_timestamp_v)intrinsic_metadata.enq_timestamp;
+        hdr.INT[0].enq_timestamp = (enq_timestamp_v)standard_metadata.enq_timestamp;
         hdr.INT[0].enq_qdepth = (enq_qdepth_v)standard_metadata.enq_qdepth;
         hdr.INT[0].deq_timedelta = (deq_timedelta_v)standard_metadata.deq_timedelta;
         hdr.INT[0].deq_qdepth = (deq_qdepth_v)standard_metadata.deq_qdepth;
@@ -264,7 +264,7 @@ control MyEgress(inout headers hdr,
 
         }
 
-     table swtrace {
+    table swtrace {
         actions = {
                 add_swtrace;
                 NoAction;
@@ -272,7 +272,7 @@ control MyEgress(inout headers hdr,
         default_action = add_swtrace();
      }
 
-     apply {
+    apply {
         if (hdr.nodeCount.isValid()) {
             swtrace.apply();
         }
