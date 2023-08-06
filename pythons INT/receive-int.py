@@ -39,7 +39,7 @@ def handle_pkt(pkt):
 
 
 def main():
-    iface = 'Wi-Fi'
+    iface = 'Wi-Fi' #interface de entrada, alterar para Ethernet quando necessário
     bind_layers(IP, nodeCount, proto=253)
     sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x))
 

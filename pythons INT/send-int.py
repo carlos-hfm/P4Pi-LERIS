@@ -33,11 +33,12 @@ class nodeCount(Packet):
 def main():
 
     #addr = socket.gethostbyname(sys.argv[1])
-    addr = '192.168.4.19'
-    iface = 'Wi-Fi'
+    addr = '192.168.4.19' #IP destino, alterar quando necessário
+    mac = "10:04:00:00:10:10" #MAC destino usado para o send back do pacote
+    iface = 'Wi-Fi' #interface de saída, alterar para Ethernet se necessário
 
     bind_layers(IP, nodeCount, proto = 253)
-    pkt = Ether(src=get_if_hwaddr(iface), dst="10:04:00:00:10:10") / IP(
+    pkt = Ether(src=get_if_hwaddr(iface), dst="FF:FF:FF:FF:FF:FF") / IP(
         dst=addr, proto=253) / nodeCount(count = 0,INT=[])
 
     sendp(pkt, iface=iface)

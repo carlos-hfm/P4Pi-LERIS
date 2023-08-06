@@ -169,6 +169,16 @@ control MyIngress(inout headers hdr,
         hdr.ethernet.dstAddr = tmp;
     }
 
+    action simple_forward(){
+        if (standard_metadata.ingress_port == 0){
+            standard_metadata.egress_port = 1;
+        } else {
+            standard_metadata.egress_port = 0;
+        }
+
+        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+    }
+
     action forward(bit<9> port) {
         standard_metadata.egress_port = port;
     }
@@ -230,10 +240,10 @@ control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
 
-    register<bit<48>>(15) metadados;
+    //register<bit<48>>(15) metadados;
 
 
-    action add_swtrace(switchID_v swid) {
+    action add_swtrace() {
         bit<48> tmp;
         hdr.nodeCount.count = hdr.nodeCount.count + 1;
         hdr.INT.push_front(1);
@@ -252,13 +262,6 @@ control MyEgress(inout headers hdr,
         hdr.INT[0].deq_qdepth = (deq_qdepth_v)standard_metadata.deq_qdepth;
         hdr.ipv4.totalLen = hdr.ipv4.totalLen + 32;
 
-        metadados.write((bit<32>)1, standard_metadata.ingress_global_timestamp);
-        metadados.write((bit<32>)2, standard_metadata.egress_global_timestamp);
-        metadados.write((bit<32>)3, (bit<48>)standard_metadata.enq_timestamp);
-        metadados.write((bit<32>)4, (bit<48>)standard_metadata.enq_qdepth);
-        metadados.write((bit<32>)5, (bit<48>)standard_metadata.deq_timedelta);
-        metadados.write((bit<32>)6, (bit<48>)standard_metadata.deq_qdepth);
-
         }
 
      table swtrace {
@@ -266,7 +269,7 @@ control MyEgress(inout headers hdr,
                 add_swtrace;
                 NoAction;
         }
-        default_action = add_swtrace(1);
+        default_action = add_swtrace();
      }
 
      apply {
