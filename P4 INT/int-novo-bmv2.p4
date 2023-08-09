@@ -211,7 +211,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ipv4);
         packet.emit(hdr.nodeCount);
         packet.emit(hdr.INT);
-      
+    }
 }
 
 /*************************************************************************
