@@ -2,19 +2,20 @@
 #include <core.p4>
 #include <v1model.p4>
 
-const bit<16> TYPE_IPV4 = 0x800;
+const bit<16> TYPE_IPV4  = 0x0800;
 const bit<8> IP_PROTO = 253;
 
-#define MAX_HOPS 10
 
+
+#define MAX_HOPS 10
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
 *************************************************************************/
 
-
-typedef bit<48> macAddr_v;
-typedef bit<32> ip4Addr_v;
+typedef bit<9>  egressSpec_t;
+typedef bit<48> macAddr_t;
+typedef bit<32> ip4Addr_t;
 
 typedef bit<31> switchID_v;
 typedef bit<9> ingress_port_v;
@@ -27,13 +28,13 @@ typedef bit<19> enq_qdepth_v;
 typedef bit<32> deq_timedelta_v;
 typedef bit<19> deq_qdepth_v;
 
-header ethernet_h {
-    macAddr_v dstAddr;
-    macAddr_v srcAddr;
+header ethernet_t {
+    macAddr_t dstAddr;
+    macAddr_t srcAddr;
     bit<16>   etherType;
 }
 
-header ipv4_h {
+header ipv4_t {
     bit<4>    version;
     bit<4>    ihl;
     bit<8>    diffserv;
@@ -44,8 +45,8 @@ header ipv4_h {
     bit<8>    ttl;
     bit<8>    protocol;
     bit<16>   hdrChecksum;
-    ip4Addr_v srcAddr;
-    ip4Addr_v dstAddr;
+    ip4Addr_t srcAddr;
+    ip4Addr_t dstAddr;
 }
 
 header nodeCount_h{
@@ -65,6 +66,7 @@ header InBandNetworkTelemetry_h {
     deq_qdepth_v deq_qdepth;
 }
 
+
 struct ingress_metadata_t {
     bit<16>  count;
 }
@@ -79,15 +81,10 @@ struct metadata {
 }
 
 struct headers {
-    ethernet_h         ethernet;
-    ipv4_h             ipv4;
+    ethernet_t   ethernet;
+    ipv4_t       ipv4;
     nodeCount_h        nodeCount;
-    InBandNetworkTelemetry_h INT;
-}
-
-struct mac_learn_digest {
-    bit<48> srcAddr;
-    bit<9>  ingress_port;
+    InBandNetworkTelemetry_h[MAX_HOPS] INT;
 }
 
 /*************************************************************************
@@ -100,42 +97,41 @@ parser MyParser(packet_in packet,
                 inout standard_metadata_t standard_metadata) {
 
     state start {
-        transition parse_ethernet;
-    }
-
-    state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
-            TYPE_IPV4: parse_ipv4;
-            default: accept;
+          TYPE_IPV4: parse_ipv4;
+          default: accept;
         }
     }
 
     state parse_ipv4 {
-        packet.extract(hdr.ipv4);
-        transition select(hdr.ipv4.protocol){
-            IP_PROTO: parse_count;
-            default: accept;
-        }
+      packet.extract(hdr.ipv4);
+      transition select(hdr.ipv4.protocol) {
+        IP_PROTO: parse_count;
+        default: accept;
+      }
     }
 
     state parse_count{
         packet.extract(hdr.nodeCount);
         meta.parser_metadata.remaining = hdr.nodeCount.count;
         transition select(meta.parser_metadata.remaining) {
-            0 : parse_int;
-            default: accept;
+            0 : accept;
+            default: parse_int;
         }
     }
 
     state parse_int {
-        packet.extract(hdr.INT);
+        packet.extract(hdr.INT.next);
+        meta.parser_metadata.remaining = meta.parser_metadata.remaining  - 1;
         transition select(meta.parser_metadata.remaining) {
             0 : accept;
-            default: accept;
+            default: parse_int;
         }
     }
 }
+
+
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************
 *************************************************************************/
@@ -152,72 +148,12 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
-
-    counter(3, CounterType.packets) pkts;
-
     action drop() {
         mark_to_drop(standard_metadata);
     }
 
-    action send_back() {
-        standard_metadata.egress_spec = standard_metadata.ingress_port;
-        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
-        bit<48> tmp;
-        tmp = hdr.ethernet.srcAddr;
-        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = tmp;
-    }
-
-    action forward(bit<9> port) {
-        standard_metadata.egress_spec = port;
-    }
-
-    action bcast() {
-        standard_metadata.mcast_grp = 1;
-    }
-
-    action mac_learn() {
-        digest<mac_learn_digest>((bit<32>)1024, { hdr.ethernet.srcAddr, standard_metadata.ingress_port });
-    }
-
-    action _nop() {
-    }
-
-    table dmac {
-        actions = {
-            forward;
-            bcast;
-            drop;
-        }
-        key = {
-            hdr.ethernet.dstAddr: exact;
-        }
-        default_action = bcast();
-        size = 512;
-    }
-
-    table smac {
-        actions = {
-            mac_learn;
-            _nop;
-            drop;
-        }
-        key = {
-            hdr.ethernet.srcAddr: exact;
-        }
-        default_action = mac_learn();
-        size = 512;
-    }
-
-
     apply {
-        if (hdr.nodeCount.isValid()){
-            send_back();
-        } else {
-            smac.apply();
-            dmac.apply();
-        }
-        pkts.count((bit<32>)standard_metadata.egress_spec);
+        standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
     }
 }
 
@@ -228,43 +164,31 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
-
-
-
-
-    action add_swtrace(switchID_v swid) {
-        bit<48> tmp;
+    
+    action add_swtrace() {
         hdr.nodeCount.count = hdr.nodeCount.count + 1;
-        hdr.INT.setValid();
-        hdr.INT.swid = 1;
-        hdr.INT.ingress_port = (ingress_port_v)standard_metadata.ingress_port;
-        hdr.INT.egress_port = (egress_port_v)standard_metadata.egress_port;
-        hdr.INT.egress_spec = (egressSpec_v)standard_metadata.egress_spec;
-        //hdr.INT[0].ingress_global_timestamp = (ingress_global_timestamp_v)standard_metadata.ingress_global_timestamp;
-        tmp = (ingress_global_timestamp_v)standard_metadata.ingress_global_timestamp;
-        //hdr.INT[0].egress_global_timestamp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
-        tmp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
-        hdr.INT.enq_timestamp = (enq_timestamp_v)standard_metadata.enq_timestamp;
-        hdr.INT.enq_qdepth = (enq_qdepth_v)standard_metadata.enq_qdepth;
-        hdr.INT.deq_timedelta = (deq_timedelta_v)standard_metadata.deq_timedelta;
-        hdr.INT.deq_qdepth = (deq_qdepth_v)standard_metadata.deq_qdepth;
+        hdr.INT.push_front(1);
+        hdr.INT[0].setValid();
+        hdr.INT[0].swid = 1;
+        hdr.INT[0].ingress_port = (ingress_port_v)standard_metadata.ingress_port;
+        hdr.INT[0].egress_port = (egress_port_v)standard_metadata.egress_port;
+        hdr.INT[0].egress_spec = (egressSpec_v)standard_metadata.egress_spec;
+        hdr.INT[0].ingress_global_timestamp = (ingress_global_timestamp_v)standard_metadata.ingress_global_timestamp;
+        hdr.INT[0].egress_global_timestamp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
+        hdr.INT[0].enq_timestamp = (enq_timestamp_v)standard_metadata.enq_timestamp;
+        hdr.INT[0].enq_qdepth = (enq_qdepth_v)standard_metadata.enq_qdepth;
+        hdr.INT[0].deq_timedelta = (deq_timedelta_v)standard_metadata.deq_timedelta;
+        hdr.INT[0].deq_qdepth = (deq_qdepth_v)standard_metadata.deq_qdepth;
         
         hdr.ipv4.totalLen = hdr.ipv4.totalLen + 32;
-        }
 
-     table swtrace {
-        actions = {
-                add_swtrace;
-                NoAction;
-        }
-        default_action = add_swtrace(1);
      }
-
-     apply {
+    
+    apply {
         if (hdr.nodeCount.isValid()) {
-            swtrace.apply();
+            add_swtrace();
         }
-    }
+      }
 }
 
 /*************************************************************************
@@ -273,23 +197,9 @@ control MyEgress(inout headers hdr,
 
 control MyComputeChecksum(inout headers hdr, inout metadata meta) {
      apply {
-        update_checksum(
-            hdr.ipv4.isValid(),
-            { hdr.ipv4.version,
-              hdr.ipv4.ihl,
-              hdr.ipv4.diffserv,
-              hdr.ipv4.totalLen,
-              hdr.ipv4.identification,
-              hdr.ipv4.flags,
-              hdr.ipv4.fragOffset,
-              hdr.ipv4.ttl,
-              hdr.ipv4.protocol,
-              hdr.ipv4.srcAddr,
-              hdr.ipv4.dstAddr },
-            hdr.ipv4.hdrChecksum,
-            HashAlgorithm.csum16);
-    }
+     }
 }
+
 
 /*************************************************************************
 ***********************  D E P A R S E R  *******************************
@@ -301,7 +211,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ipv4);
         packet.emit(hdr.nodeCount);
         packet.emit(hdr.INT);
-    }
+      
 }
 
 /*************************************************************************
