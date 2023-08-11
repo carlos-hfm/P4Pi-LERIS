@@ -152,8 +152,23 @@ control MyIngress(inout headers hdr,
         mark_to_drop(standard_metadata);
     }
 
+    action send_back() {
+        standard_metadata.egress_spec = standard_metadata.ingress_port;
+        bit<48> tmp;
+        tmp = hdr.ethernet.srcAddr;
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+        hdr.ethernet.dstAddr = tmp;
+    }
+
     apply {
-        standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+        if (hdr.nodeCount.isValid()) {
+            /* Action usada para o Setup com send e receive no mesmo host */
+            /* Comentar essa linha caso mudar o Setup para send e receive em portas diferentes */
+            send_back();
+        } else {
+            standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+        }
+        
     }
 }
 
