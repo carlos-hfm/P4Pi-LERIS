@@ -48,7 +48,7 @@ def main():
     while True:
         sendp(pkt, iface=iface)
         pkt.show2()
-        sleep(0.2)
+        sleep(1)
 
 if __name__ == '__main__':
     main()

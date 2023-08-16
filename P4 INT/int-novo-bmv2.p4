@@ -163,7 +163,7 @@ control MyIngress(inout headers hdr,
     apply {
         if (hdr.nodeCount.isValid()) {
             /* Action usada para o Setup com send e receive no mesmo host */
-            /* Comentar essa linha caso mudar o Setup para send e receive em portas diferentes */
+            /* Comentar essa linha caso mudar o Setup para send e receive em portas (wifi e cabo) diferentes */
             send_back();
         } else {
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
