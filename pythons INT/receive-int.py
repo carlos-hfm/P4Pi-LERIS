@@ -6,7 +6,12 @@ import random
 import struct
 
 from time import sleep
-from scapy.all import Packet, bind_layers, BitField, ShortField, IntField, Ether, IP, UDP, sendp, get_if_hwaddr, sniff, PacketListField
+from scapy.all import Packet, bind_layers, BitField, ShortField, IntField, Ether, IP, UDP, sendp, get_if_hwaddr, sniff, \
+    PacketListField
+
+import os, time
+from influxdb_client_3 import InfluxDBClient3, Point
+
 
 class InBandNetworkTelemetry(Packet):
     fields_desc = [
@@ -26,20 +31,23 @@ class InBandNetworkTelemetry(Packet):
     def extract_padding(self, p):
         return "", p
 
+
 class NodeCount(Packet):
     name = "nodeCount"
     fields_desc = [ShortField("count", 0),
                    PacketListField("INT", [], InBandNetworkTelemetry, count_from=lambda pkt: (pkt.count * 1))]
 
-def handle_pkt(pkt):
-    #pkt.show2()
+
+def handle_pkt(pkt, client, database):
+    # pkt.show2()
     if NodeCount in pkt:
         for int_pkt in pkt[NodeCount].INT:
             telemetry = int_pkt[InBandNetworkTelemetry]
+            print("Packet - INT Header:")
+            print()
             print("Switch ID:", telemetry.switchID_t)
-            print("Ingress Port:", telemetry.ingress_port)
-            print("Egress Port:", telemetry.egress_port)
-            print("Egress Spec:", telemetry.egress_spec)
+            # print("Egress Port:", telemetry.egress_port)
+            # print("Egress Spec:", telemetry.egress_spec)
             print("Ingress Global Timestamp:", telemetry.ingress_global_timestamp)
             print("Egress Global Timestamp:", telemetry.egress_global_timestamp)
             print("Enqueue Timestamp:", telemetry.enq_timestamp)
@@ -47,13 +55,34 @@ def handle_pkt(pkt):
             print("Dequeue Timedelta:", telemetry.deq_timedelta)
             print("Dequeue Queue Depth:", telemetry.deq_qdepth)
             print("------------------------------")
-def main():
-    iface = 'Wi-Fi' #interface de entrada, alterar para Ethernet quando necessário
+            point = (
+                Point("Testes2")
+                .tag("ID", "p4pi")
+                .field(telemetry.switchID_t, telemetry.deq_timedelta)
+            )
+            client.write(database=database, record=point)
 
-    bind_layers(IP, NodeCount, proto=253)  
+
+def connectDB():
+    token = os.environ.get("INFLUXDB_TOKEN")
+    org = "Research"
+    host = "https://us-east-1-1.aws.cloud2.influxdata.com"
+
+    client = InfluxDBClient3(host=host, token=token, org=org)
+    return client
+
+
+def main():
+    client = connectDB()
+    database = "CG-Monitoramento"
+
+    iface = 'Wi-Fi'  # interface de entrada, alterar para Ethernet quando necessário
+
+    bind_layers(IP, NodeCount, proto=253)  # Correção na nomenclatura da classe
     bind_layers(Ether, IP)
 
-    sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x))
+    sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database))
+
 
 if __name__ == '__main__':
     main()
