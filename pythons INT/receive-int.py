@@ -6,8 +6,7 @@ import random
 import struct
 
 from time import sleep
-from scapy.all import Packet, bind_layers, BitField, ShortField, IntField, Ether, IP, UDP, sendp, get_if_hwaddr, sniff, \
-    PacketListField
+from scapy.all import Packet, bind_layers, BitField, ShortField, IntField, Ether, IP, UDP, sendp, get_if_hwaddr, sniff, PacketListField
 
 import os, time
 from influxdb_client_3 import InfluxDBClient3, Point
@@ -54,11 +53,14 @@ def handle_pkt(pkt, client, database):
             print("Enqueue Queue Depth:", telemetry.enq_qdepth)
             print("Dequeue Timedelta:", telemetry.deq_timedelta)
             print("Dequeue Queue Depth:", telemetry.deq_qdepth)
+
             print("------------------------------")
             point = (
-                Point("Testes2")
-                .tag("ID", "p4pi")
-                .field(telemetry.switchID_t, telemetry.deq_timedelta)
+                Point("INT")
+                .tag("Jogo", "Fortnite-T")
+                .field("Enq. Queue Depth", telemetry.enq_qdepth)
+                .field("Deq. Queue Depth", telemetry.deq_qdepth)
+                .field("Deq. Timedelta", telemetry.deq_timedelta)
             )
             client.write(database=database, record=point)
 
