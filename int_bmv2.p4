@@ -162,10 +162,18 @@ control MyIngress(inout headers hdr,
 
     apply {
         if (hdr.nodeCount.isValid()) {
-            /* Action usada para o Setup com send e receive no mesmo host */
-            /* Comentar essa linha caso mudar o Setup para send e receive em portas (wifi e cabo) diferentes */
-            send_back();
+            /*Nova logica - se pacote original, chama recirculação e encaminha*/
+            if (standard_metadata.instance_type == 0){
+                recirculate_preserving_field_list();
+                standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+            } else {
+                /*Se pacote recirculado, envia de volta*/
+                send_back();
+            }
+            
+            
         } else {
+            /*Se pacote normal sem INT, faz o roteamento normal*/
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
         }
         
@@ -184,7 +192,12 @@ control MyEgress(inout headers hdr,
         hdr.nodeCount.count = hdr.nodeCount.count + 1;
         hdr.INT.push_front(1);
         hdr.INT[0].setValid();
-        hdr.INT[0].swid = 1;
+        //1 para uplink, 2 para downlink
+        if (standard_metadata.instance_type == 0){
+            hdr.INT[0].swid = 1;
+        } else {
+            hdr.INT[0].swid = 2;
+        }
         hdr.INT[0].ingress_port = (ingress_port_v)standard_metadata.ingress_port;
         hdr.INT[0].egress_port = (egress_port_v)standard_metadata.egress_port;
         hdr.INT[0].egress_spec = (egressSpec_v)standard_metadata.egress_spec;
