@@ -161,17 +161,8 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
-        if (hdr.nodeCount.isValid()) {
-            /*Nova logica - se pacote original, chama recirculação e encaminha*/
-            if (standard_metadata.instance_type == 0){
-                recirculate_preserving_field_list();
-                standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
-            } else {
-                /*Se pacote recirculado, envia de volta*/
+        if (hdr.nodeCount.isValid() && standard_metadata.instance_type != 0/*verificar*/) {
                 send_back();
-            }
-            
-            
         } else {
             /*Se pacote normal sem INT, faz o roteamento normal*/
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
@@ -215,6 +206,10 @@ control MyEgress(inout headers hdr,
     apply {
         if (hdr.nodeCount.isValid()) {
             add_swtrace();
+            /*Se pacote original, recircula*/
+            if (standard_metadata.instance_type == 0){
+                recirculate_preserving_field_list(3);
+            }
         }
       }
 }
