@@ -6,6 +6,12 @@ const bit<16> TYPE_IPV4  = 0x0800;
 const bit<8> IP_PROTO = 253;
 
 
+#define PKT_INSTANCE_TYPE_NORMAL 0
+#define PKT_INSTANCE_TYPE_INGRESS_CLONE 1
+#define PKT_INSTANCE_TYPE_EGRESS_CLONE 2
+#define PKT_INSTANCE_TYPE_COALESCED 3
+#define PKT_INSTANCE_TYPE_INGRESS_RECIRC 4
+
 
 #define MAX_HOPS 10
 
@@ -75,9 +81,16 @@ struct parser_metadata_t {
     bit<16>  remaining;
 }
 
+struct resubmit_meta_t {
+   bit<8> i;
+}
+
+@field_list(1)
+
 struct metadata {
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
+    resubmit_meta_t     resubmit_meta;
 }
 
 struct headers {
@@ -123,7 +136,7 @@ parser MyParser(packet_in packet,
 
     state parse_int {
         packet.extract(hdr.INT.next);
-        meta.parser_metadata.remaining = meta.parser_metadata.remaining  - 1;
+        meta.parser_metadata.remaining = meta.parser_metadata.remaining - 1;
         transition select(meta.parser_metadata.remaining) {
             0 : accept;
             default: parse_int;
@@ -154,15 +167,21 @@ control MyIngress(inout headers hdr,
 
     action send_back() {
         standard_metadata.egress_spec = standard_metadata.ingress_port;
-        bit<48> tmp;
-        tmp = hdr.ethernet.srcAddr;
+        bit<48> tmp_mac;
+        bit<32> tmp_ip;
+
+        tmp_mac = hdr.ethernet.srcAddr;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = tmp;
+        hdr.ethernet.dstAddr = tmp_mac;
+
+        tmp_ip = hdr.ipv4.srcAddr;
+        hdr.ipv4.srcAddr = hdr.ipv4.dstAddr;
+        hdr.ipv4.dstAddr = tmp_ip;
     }
 
     apply {
-        if (hdr.nodeCount.isValid() && standard_metadata.instance_type != 0/*verificar*/) {
-                send_back();
+        if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
+            send_back();
         } else {
             /*Se pacote normal sem INT, faz o roteamento normal*/
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
@@ -178,6 +197,10 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
+    
+    action my_recirculate() {
+        recirculate_preserving_field_list(1);
+    }
     
     action add_swtrace() {
         hdr.nodeCount.count = hdr.nodeCount.count + 1;
@@ -207,8 +230,8 @@ control MyEgress(inout headers hdr,
         if (hdr.nodeCount.isValid()) {
             add_swtrace();
             /*Se pacote original, recircula*/
-            if (standard_metadata.instance_type == 0){
-                recirculate_preserving_field_list(3);
+            if (standard_metadata.instance_type == PKT_INSTANCE_TYPE_NORMAL){
+                my_recirculate();
             }
         }
       }
