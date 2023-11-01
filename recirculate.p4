@@ -6,6 +6,15 @@ const bit<16> TYPE_IPV4  = 0x0800;
 const bit<8> IP_PROTO = 253;
 #define MAX_HOPS 10
 
+/* Define constants for types of packets */
+#define PKT_INSTANCE_TYPE_NORMAL 0
+#define PKT_INSTANCE_TYPE_INGRESS_CLONE 1
+#define PKT_INSTANCE_TYPE_EGRESS_CLONE 2
+#define PKT_INSTANCE_TYPE_COALESCED 3
+#define PKT_INSTANCE_TYPE_INGRESS_RECIRC 4
+#define PKT_INSTANCE_TYPE_REPLICATION 5
+#define PKT_INSTANCE_TYPE_RESUBMIT 6
+
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -25,8 +34,6 @@ typedef bit<32>  enq_timestamp_v;
 typedef bit<19> enq_qdepth_v;
 typedef bit<32> deq_timedelta_v;
 typedef bit<19> deq_qdepth_v;
-
-@field_list(1)
 
 header ethernet_t {
     macAddr_t dstAddr;
@@ -75,11 +82,17 @@ struct parser_metadata_t {
     bit<16>  remaining;
 }
 
+struct UM_t {
+    @field_list(1)
+    bit<32> x;
+}
+
 
 struct metadata {
     /* empty */
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
+    UM_t                  UM_meta;
 }
 
 struct headers {
@@ -173,7 +186,7 @@ control MyIngress(inout headers hdr,
             hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
         }
 
-        if (hdr.nodeCount.isValid()) {
+        if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
             send_back();
         } else {
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
@@ -195,7 +208,8 @@ control MyEgress(inout headers hdr,
     }
     
     apply {
-        if (hdr.nodeCount.isValid() && standard_metadata.instance_type == 0){
+        if (hdr.nodeCount.isValid() && standard_metadata.instance_type != PKT_INSTANCE_TYPE_INGRESS_RECIRC){
+            meta.UM_meta.x = 10;
             my_recirculate();
         }
      }
@@ -219,6 +233,8 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.nodeCount);
+        packet.emit(hdr.INT);
     }
 }
 
