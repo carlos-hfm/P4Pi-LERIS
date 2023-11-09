@@ -81,9 +81,13 @@ struct parser_metadata_t {
     bit<16>  remaining;
 }
 
-@field_list(1)
+struct UM_t {
+    @field_list(1)
+    bit<32> x;
+}
 
 struct metadata {
+    UM_t                  UM_meta;
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
 }
@@ -176,9 +180,10 @@ control MyIngress(inout headers hdr,
 
     apply {
         if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
+            //Se pacote INT e recirculado, envia de volta
             send_back();
         } else {
-            /*Se pacote normal sem INT, faz o roteamento normal*/
+            /*Se pacote normal ou sem INT, faz o roteamento normal*/
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
         }
         
@@ -226,6 +231,7 @@ control MyEgress(inout headers hdr,
             add_swtrace();
             /*Se pacote original, recircula*/
             if (standard_metadata.instance_type == PKT_INSTANCE_TYPE_NORMAL){
+                meta.UM_meta.x = 10;
                 my_recirculate();
             }
         }
