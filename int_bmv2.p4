@@ -81,13 +81,8 @@ struct parser_metadata_t {
     bit<16>  remaining;
 }
 
-struct UM_t {
-    @field_list(1)
-    bit<32> x;
-}
 
 struct metadata {
-    UM_t                  UM_meta;
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
 }
@@ -160,6 +155,9 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
+    
+    counter(5, CounterType.packets) sendingBackPkts;
+
     action drop() {
         mark_to_drop(standard_metadata);
     }
@@ -182,9 +180,11 @@ control MyIngress(inout headers hdr,
         if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
             //Se pacote INT e recirculado, envia de volta
             send_back();
+            sendingBackPkts.count(1);
         } else {
             /*Se pacote normal ou sem INT, faz o roteamento normal*/
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+            sendingBackPkts.count(2);
         }
         
     }
@@ -199,15 +199,15 @@ control MyEgress(inout headers hdr,
                  inout standard_metadata_t standard_metadata) {
     
     action my_recirculate() {
-        recirculate_preserving_field_list(1);
+        recirculate_preserving_field_list(0);
     }
     
     action add_swtrace() {
         hdr.nodeCount.count = hdr.nodeCount.count + 1;
         hdr.INT.push_front(1);
         hdr.INT[0].setValid();
-        //1 para uplink, 2 para downlink
-        if (standard_metadata.instance_type == 0){
+        //1 para downlink, 2 para uplink
+        if (hdr.nodeCount.count == 2){
             hdr.INT[0].swid = 1;
         } else {
             hdr.INT[0].swid = 2;
@@ -230,8 +230,7 @@ control MyEgress(inout headers hdr,
         if (hdr.nodeCount.isValid()) {
             add_swtrace();
             /*Se pacote original, recircula*/
-            if (standard_metadata.instance_type == PKT_INSTANCE_TYPE_NORMAL){
-                meta.UM_meta.x = 10;
+            if (hdr.nodeCount.count < 2){
                 my_recirculate();
             }
         }
