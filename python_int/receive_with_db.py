@@ -37,32 +37,54 @@ class NodeCount(Packet):
                    PacketListField("INT", [], InBandNetworkTelemetry, count_from=lambda pkt: (pkt.count * 1))]
 
 
+class INTP4Pi:
+    def __init__(self):
+        self.downlink_enq_qdepth = 0
+        self.downlink_deq_qdepth = 0
+        self.downlink_deq_timedelta = 0
+        self.uplink_enq_qdepth = 0
+        self.uplink_deq_qdepth = 0
+        self.uplink_deq_timedelta = 0
+
+
 def handle_pkt(pkt, client, database):
     # pkt.show2()
     if NodeCount in pkt:
+        dataINT = INTP4Pi()
+        print("Packet - INT Header:")
         for int_pkt in pkt[NodeCount].INT:
             telemetry = int_pkt[InBandNetworkTelemetry]
-            print("Packet - INT Header:")
-            print()
-            print("Switch ID:", telemetry.switchID_t)
-            # print("Egress Port:", telemetry.egress_port)
-            # print("Egress Spec:", telemetry.egress_spec)
+            if telemetry.switchID_t == 1:
+                print("Downlink - Interface WiFi")
+                dataINT.downlink_enq_qdepth = telemetry.enq_qdepth
+                dataINT.downlink_deq_qdepth = telemetry.deq_qdepth
+                dataINT.downlink_deq_timedelta = telemetry.deq_timedelta
+            else:
+                print("Uplink - Interface Cabeada")
+                dataINT.uplink_enq_qdepth = telemetry.enq_qdepth
+                dataINT.uplink_deq_qdepth = telemetry.deq_qdepth
+                dataINT.uplink_deq_timedelta = telemetry.deq_timedelta
             print("Ingress Global Timestamp:", telemetry.ingress_global_timestamp)
             print("Egress Global Timestamp:", telemetry.egress_global_timestamp)
             print("Enqueue Timestamp:", telemetry.enq_timestamp)
             print("Enqueue Queue Depth:", telemetry.enq_qdepth)
             print("Dequeue Timedelta:", telemetry.deq_timedelta)
             print("Dequeue Queue Depth:", telemetry.deq_qdepth)
-
             print("------------------------------")
-            point = (
-                Point("INT")
-                .tag("Jogo", "Fortnite-T")
-                .field("Enq. Queue Depth", telemetry.enq_qdepth)
-                .field("Deq. Queue Depth", telemetry.deq_qdepth)
-                .field("Deq. Timedelta", telemetry.deq_timedelta)
-            )
-            client.write(database=database, record=point)
+
+        """
+        point = (
+            Point("INT")
+            .tag("Jogo", "Fortnite-T")
+            .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
+            .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
+            .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
+            .field("uplink enq_qdepth", dataINT.uplink_enq_qdepth)
+            .field("uplink deq_qdepth", dataINT.uplink_deq_qdepth)
+            .field("uplink deq_timedelta", dataINT.uplink_deq_timedelta)
+        )
+        client.write(database=database, record=point)
+        """
 
 
 def connectDB():
@@ -75,7 +97,8 @@ def connectDB():
 
 
 def main():
-    client = connectDB()
+    #client = connectDB()
+    client = 1
     database = "CG-Monitoramento"
 
     iface = 'Wi-Fi'  # interface de entrada, alterar para Ethernet quando necessário
