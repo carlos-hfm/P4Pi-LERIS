@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
-import argparse
-import sys
-import socket
-import random
-import struct
 
-from time import sleep
 from scapy.all import Packet, bind_layers, BitField, ShortField, IntField, Ether, IP, UDP, sendp, get_if_hwaddr, sniff, PacketListField
 
-import os, time
+import os
 from influxdb_client_3 import InfluxDBClient3, Point
 
 
@@ -49,9 +43,9 @@ class INTP4Pi:
 
 def handle_pkt(pkt, client, database):
     # pkt.show2()
+    #print("Packet - INT Header:")
     if NodeCount in pkt:
         dataINT = INTP4Pi()
-        print("Packet - INT Header:")
         for int_pkt in pkt[NodeCount].INT:
             telemetry = int_pkt[InBandNetworkTelemetry]
             if telemetry.switchID_t == 1:
@@ -64,13 +58,15 @@ def handle_pkt(pkt, client, database):
                 dataINT.uplink_enq_qdepth = telemetry.enq_qdepth
                 dataINT.uplink_deq_qdepth = telemetry.deq_qdepth
                 dataINT.uplink_deq_timedelta = telemetry.deq_timedelta
-            print("Ingress Global Timestamp:", telemetry.ingress_global_timestamp)
-            print("Egress Global Timestamp:", telemetry.egress_global_timestamp)
+
             print("Enqueue Timestamp:", telemetry.enq_timestamp)
             print("Enqueue Queue Depth:", telemetry.enq_qdepth)
             print("Dequeue Timedelta:", telemetry.deq_timedelta)
             print("Dequeue Queue Depth:", telemetry.deq_qdepth)
-            print("------------------------------")
+            if telemetry.switchID_t == 1:
+                print("------------------------------")
+            else:
+                print("\n")
 
         """
         point = (
@@ -92,7 +88,8 @@ def connectDB():
     org = "Research"
     host = "https://us-east-1-1.aws.cloud2.influxdata.com"
 
-    client = InfluxDBClient3(host=host, token=token, org=org)
+    #client = InfluxDBClient3(host=host, token=token, org=org)
+    client = 1
     return client
 
 
