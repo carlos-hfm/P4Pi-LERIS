@@ -68,10 +68,10 @@ def handle_pkt(pkt, client, database):
             else:
                 print("\n")
 
-        """
+        
         point = (
             Point("INT")
-            .tag("Jogo", "Fortnite-T")
+            .tag("Jogo", "Teste")
             .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
             .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
             .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
@@ -80,7 +80,7 @@ def handle_pkt(pkt, client, database):
             .field("uplink deq_timedelta", dataINT.uplink_deq_timedelta)
         )
         client.write(database=database, record=point)
-        """
+        
 
 
 def connectDB():
@@ -88,14 +88,14 @@ def connectDB():
     org = "Research"
     host = "https://us-east-1-1.aws.cloud2.influxdata.com"
 
-    #client = InfluxDBClient3(host=host, token=token, org=org)
-    client = 1
+    client = InfluxDBClient3(host=host, token=token, org=org)
+    #client = 1
     return client
 
 
 def main():
-    #client = connectDB()
-    client = 1
+    client = connectDB()
+    #client = 1
     database = "CG-Monitoramento"
 
     iface = 'Wi-Fi'  # interface de entrada, alterar para Ethernet quando necessário
@@ -103,6 +103,7 @@ def main():
     bind_layers(IP, NodeCount, proto=253)  # Correção na nomenclatura da classe
     bind_layers(Ether, IP)
 
+    print("Esperando pacotes...")
     sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database))
 
 
