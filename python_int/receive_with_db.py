@@ -70,8 +70,8 @@ def handle_pkt(pkt, client, database):
 
         
         point = (
-            Point("INT")
-            .tag("Jogo", "Teste")
+            Point("Experimentos")
+            .tag("ID", "Ex2")
             .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
             .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
             .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
