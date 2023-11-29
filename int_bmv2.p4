@@ -6,6 +6,12 @@ const bit<16> TYPE_IPV4  = 0x0800;
 const bit<8> IP_PROTO = 253;
 
 
+#define PKT_INSTANCE_TYPE_NORMAL 0
+#define PKT_INSTANCE_TYPE_INGRESS_CLONE 1
+#define PKT_INSTANCE_TYPE_EGRESS_CLONE 2
+#define PKT_INSTANCE_TYPE_COALESCED 3
+#define PKT_INSTANCE_TYPE_INGRESS_RECIRC 4
+
 
 #define MAX_HOPS 10
 
@@ -75,6 +81,7 @@ struct parser_metadata_t {
     bit<16>  remaining;
 }
 
+
 struct metadata {
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
@@ -123,7 +130,7 @@ parser MyParser(packet_in packet,
 
     state parse_int {
         packet.extract(hdr.INT.next);
-        meta.parser_metadata.remaining = meta.parser_metadata.remaining  - 1;
+        meta.parser_metadata.remaining = meta.parser_metadata.remaining - 1;
         transition select(meta.parser_metadata.remaining) {
             0 : accept;
             default: parse_int;
@@ -148,25 +155,36 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
+    
+    counter(5, CounterType.packets) sendingBackPkts;
+
     action drop() {
         mark_to_drop(standard_metadata);
     }
 
     action send_back() {
         standard_metadata.egress_spec = standard_metadata.ingress_port;
-        bit<48> tmp;
-        tmp = hdr.ethernet.srcAddr;
+        bit<48> tmp_mac;
+        bit<32> tmp_ip;
+
+        tmp_mac = hdr.ethernet.srcAddr;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = tmp;
+        hdr.ethernet.dstAddr = tmp_mac;
+
+        tmp_ip = hdr.ipv4.srcAddr;
+        hdr.ipv4.srcAddr = hdr.ipv4.dstAddr;
+        hdr.ipv4.dstAddr = tmp_ip;
     }
 
     apply {
-        if (hdr.nodeCount.isValid()) {
-            /* Action usada para o Setup com send e receive no mesmo host */
-            /* Comentar essa linha caso mudar o Setup para send e receive em portas (wifi e cabo) diferentes */
+        if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
+            //Se pacote INT e recirculado, envia de volta
             send_back();
+            sendingBackPkts.count(1);
         } else {
+            /*Se pacote normal ou sem INT, faz o roteamento normal*/
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+            sendingBackPkts.count(2);
         }
         
     }
@@ -180,11 +198,20 @@ control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
     
+    action my_recirculate() {
+        recirculate_preserving_field_list(0);
+    }
+    
     action add_swtrace() {
         hdr.nodeCount.count = hdr.nodeCount.count + 1;
         hdr.INT.push_front(1);
         hdr.INT[0].setValid();
-        hdr.INT[0].swid = 1;
+        //1 para downlink, 2 para uplink
+        if (hdr.nodeCount.count == 2){
+            hdr.INT[0].swid = 1;
+        } else {
+            hdr.INT[0].swid = 2;
+        }
         hdr.INT[0].ingress_port = (ingress_port_v)standard_metadata.ingress_port;
         hdr.INT[0].egress_port = (egress_port_v)standard_metadata.egress_port;
         hdr.INT[0].egress_spec = (egressSpec_v)standard_metadata.egress_spec;
@@ -202,6 +229,10 @@ control MyEgress(inout headers hdr,
     apply {
         if (hdr.nodeCount.isValid()) {
             add_swtrace();
+            /*Se pacote original, recircula*/
+            if (hdr.nodeCount.count < 2){
+                my_recirculate();
+            }
         }
       }
 }
