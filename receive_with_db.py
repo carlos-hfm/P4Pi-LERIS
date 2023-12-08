@@ -68,18 +68,18 @@ def handle_pkt(pkt, client, database):
             else:
                 print("\n")
 
-        
-        point = (
-            Point("Experimentos")
-            .tag("ID", "Ex2")
-            .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
-            .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
-            .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
-            .field("uplink enq_qdepth", dataINT.uplink_enq_qdepth)
-            .field("uplink deq_qdepth", dataINT.uplink_deq_qdepth)
-            .field("uplink deq_timedelta", dataINT.uplink_deq_timedelta)
-        )
-        client.write(database=database, record=point)
+        if pkt[NodeCount].count == 2:
+            point = (
+                Point("Experimentos")
+                .tag("ID", "Ex2")
+                .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
+                .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
+                .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
+                .field("uplink enq_qdepth", dataINT.uplink_enq_qdepth)
+                .field("uplink deq_qdepth", dataINT.uplink_deq_qdepth)
+                .field("uplink deq_timedelta", dataINT.uplink_deq_timedelta)
+            )
+            #client.write(database=database, record=point)
         
 
 
