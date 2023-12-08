@@ -5,6 +5,8 @@ from scapy.all import Packet, bind_layers, BitField, ShortField, IntField, Ether
 import os
 from influxdb_client_3 import InfluxDBClient3, Point
 
+import sys
+
 
 class InBandNetworkTelemetry(Packet):
     fields_desc = [
@@ -71,7 +73,7 @@ def handle_pkt(pkt, client, database):
         if pkt[NodeCount].count == 2:
             point = (
                 Point("Experimentos")
-                .tag("ID", "Ex2")
+                .tag("ID", sys.argv[1])
                 .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
                 .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
                 .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
@@ -94,17 +96,20 @@ def connectDB():
 
 
 def main():
-    client = connectDB()
-    #client = 1
-    database = "CG-Monitoramento"
+    if len(sys.argv) == 2:
+        client = connectDB()
+        #client = 1
+        database = "CG-Monitoramento"
 
-    iface = 'Wi-Fi'  # interface de entrada, alterar para Ethernet quando necessário
+        iface = 'Wi-Fi'  # interface de entrada, alterar para Ethernet quando necessário
 
-    bind_layers(IP, NodeCount, proto=253)  # Correção na nomenclatura da classe
-    bind_layers(Ether, IP)
+        bind_layers(IP, NodeCount, proto=253)  # Correção na nomenclatura da classe
+        bind_layers(Ether, IP)
 
-    print("Esperando pacotes...")
-    sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database))
+        print("Esperando pacotes...")
+        sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database))
+    else:
+        print("Espera-se 1 argumento: ID do experimento...")
 
 
 if __name__ == '__main__':
