@@ -73,7 +73,7 @@ def handle_pkt(pkt, client, database):
         if pkt[NodeCount].count == 2:
             point = (
                 Point("Experimentos")
-                .tag("ID", sys.argv[1])
+                .tag("ID", sys.argv[1]) #ID passado por argumento
                 .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
                 .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
                 .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
@@ -81,7 +81,7 @@ def handle_pkt(pkt, client, database):
                 .field("uplink deq_qdepth", dataINT.uplink_deq_qdepth)
                 .field("uplink deq_timedelta", dataINT.uplink_deq_timedelta)
             )
-            #client.write(database=database, record=point)
+            client.write(database=database, record=point)
         
 
 
@@ -96,7 +96,7 @@ def connectDB():
 
 
 def main():
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 3:
         client = connectDB()
         #client = 1
         database = "CG-Monitoramento"
@@ -107,9 +107,10 @@ def main():
         bind_layers(Ether, IP)
 
         print("Esperando pacotes...")
-        sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database))
+        timeEx = int(sys.argv[2])
+        sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database), timeout=timeEx * 60)
     else:
-        print("Espera-se 1 argumento: ID do experimento...")
+        print("Espera-se 2 argumentos: ID e duração (em minutos) do experimento...")
 
 
 if __name__ == '__main__':
