@@ -15,18 +15,22 @@ def connectDB():
 
 def main():
     client = connectDB()
-    database = "CG-Monitoramento"
     
-    query = """
-            SELECT *
-            FROM "Experimentos"
-            WHERE
-            "ID" IN ('Ex5')
-            """
+    if len(sys.argv) == 2:
+        query = f"""
+                    SELECT *
+                    FROM "Experimentos"
+                    WHERE
+                    "ID" IN ('{sys.argv[1]}')
+                """
 
-    reader = client.query(query=query, language="sql")
-    table = reader.read_all()
-    print(table.to_pandas().to_markdown())      
+        data = client.query(query=query, language="sql")
+        df = data.to_pandas().sort_values(by="time")
+        print(df)
+        df.to_csv(f"CG_data/{sys.argv[1]}.csv")
+    else :
+        print("Espera-se 1 argumento: ID do experimento...")  
+
 
 main()
 

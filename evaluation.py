@@ -53,8 +53,8 @@ def compare2Ex(df1, df2, coluna, medida):
     print()
 
     plt.figure(figsize=(10, 6))
-    plt.plot(df1[coluna_tempo].iloc[2:1700], df1[coluna].iloc[2:1700], label=f'{sys.argv[1]} - {coluna}')
-    plt.plot(df1[coluna_tempo].iloc[2:1700], df2[coluna].iloc[2:1700], label=f'{sys.argv[2]} - {coluna}')
+    plt.plot(df1[coluna_tempo].iloc[2:740], df1[coluna].iloc[2:740], label=f'{sys.argv[1]} - {coluna}')
+    plt.plot(df1[coluna_tempo].iloc[2:740], df2[coluna].iloc[2:740], label=f'{sys.argv[2]} - {coluna}')
 
     # Adiciona rótulos e título
     plt.xlabel("Tempo")
@@ -72,13 +72,13 @@ def compare2Ex(df1, df2, coluna, medida):
 def main():
 
     if len(sys.argv) == 2:
-        df = pd.read_csv(f'../CG_data/{sys.argv[1]}.csv')
+        df = pd.read_csv(f'CG_data/{sys.argv[1]}.csv')
         compare1Ex(df, 'downlink deq_qdepth', 'uplink deq_qdepth', 'Pacotes')
         compare1Ex(df, 'downlink enq_qdepth', 'uplink enq_qdepth', 'Pacotes')
         compare1Ex(df, 'downlink deq_timedelta', 'uplink deq_timedelta', 'Microsegundos')
     elif len(sys.argv) == 3:
-        df1 = pd.read_csv(f'../CG_data/{sys.argv[1]}.csv')
-        df2 = pd.read_csv(f'../CG_data/{sys.argv[2]}.csv')
+        df1 = pd.read_csv(f'CG_data/{sys.argv[1]}.csv')
+        df2 = pd.read_csv(f'CG_data/{sys.argv[2]}.csv')
         compare2Ex(df1, df2, 'downlink enq_qdepth', 'Pacotes')
         compare2Ex(df1, df2, 'uplink enq_qdepth', 'Pacotes')
         compare2Ex(df1, df2, 'downlink deq_timedelta', 'Microssegundos')
