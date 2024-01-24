@@ -27,7 +27,7 @@ def main():
         data = client.query(query=query, language="sql")
         df = data.to_pandas().sort_values(by="time")
         print(df)
-        df.to_csv(f"CG_data/{sys.argv[1]}.csv")
+        df.to_csv(f"INT_data/{sys.argv[1]}.csv")
     else :
         print("Espera-se 1 argumento: ID do experimento...")  
 
