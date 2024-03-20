@@ -62,7 +62,7 @@ def compare2Ex(df1, df2, coluna, medida):
 
     plt.figure(figsize=(10, 6))
     plt.plot(df1[coluna_tempo].iloc[2:740], df1[coluna].iloc[2:740], label=f'{sys.argv[1]} - {coluna}')
-    plt.plot(df1[coluna_tempo].iloc[2:740], df2[coluna].iloc[2:740], label=f'{sys.argv[2]} - {coluna}')
+    plt.plot(df2[coluna_tempo].iloc[2:740], df2[coluna].iloc[2:740], label=f'{sys.argv[2]} - {coluna}')
 
     # Adiciona rótulos e título
     plt.xlabel("Time")
