@@ -32,7 +32,7 @@ def compare1Ex(df, coluna1, coluna2, medida):
     # Adiciona rótulos e título
     plt.xlabel("Time")
     plt.ylabel(medida)
-    plt.title(f"{ex1} - Comparison between {coluna1} and {coluna2}")
+    plt.title(f"{sys.argv[1]} - Comparison between {coluna1} and {coluna2}")
     
     # Adiciona a legenda
     plt.legend()
