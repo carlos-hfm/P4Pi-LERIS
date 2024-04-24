@@ -11,10 +11,11 @@ import sys
 '''
 
 def oneBoxplot():
-    experimento = 'Ex30' # Inserir ID experimento
-    coluna = 'downlink deq_timedelta'
+    folder = 'INT_tests'
+    experimento = 'teste8000MK' # Inserir ID experimento
+    coluna = 'downlink deq_qdepth'
 
-    df = pd.read_csv(f'INT_data/{experimento}.csv')
+    df = pd.read_csv(f'{folder}/{experimento}.csv')
     data = df[coluna]
 
     minimo = data.min()
@@ -45,13 +46,31 @@ def oneBoxplot():
     plt.show()
 
 
+def NBoxplot():
+    folder = 'INT_tests'
+    coluna = 'downlink deq_qdepth'
+    experimentos = ['teste2000MK', 'teste4000MK', 'teste6000MK', 'x']
+
+    data = []
+
+    for experimento in experimentos:
+        if experimento != 'x':
+            df = pd.read_csv(f'{folder}/{experimento}.csv')
+            data.append(df[coluna])
+    
+
+    plt.figure(figsize =(11, 6))
+    plt.boxplot(data,  vert = 1, patch_artist = False)
+    plt.ylabel("Packets")
+
+    plt.show()
 
 
 
 
 def main():
-
-    oneBoxplot()
+    #oneBoxplot()
+    NBoxplot()
     
 
 
