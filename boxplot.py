@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import sys
+import os
 
 '''
     criar boxplots dos dados INT
@@ -66,11 +66,79 @@ def NBoxplot():
     plt.show()
 
 
+def saveStatistics():
+    in_folder = 'INT_data'
+    out_folder = 'Stats_INT'
+    int_columns = ['downlink deq_qdepth', 
+                    'downlink deq_timedelta', 
+                    'downlink enq_qdepth', 
+                    'uplink deq_qdepth', 
+                    'uplink deq_timedelta', 
+                    'uplink enq_qdepth']
+    
+    stat_columns = ['min',
+                    'max',
+                    'avg',
+                    'mid',
+                    'std_dev',
+                    'first_quartile',
+                    'third_quartile',
+                    'percentile_95',
+                    'lower_limit',
+                    'upper_limit']
+    
+    filesList = os.listdir(in_folder)
+    
+    for file in filesList:
+        filePath = os.path.join(in_folder, file)
+        if os.path.isfile(filePath):
+            df = pd.read_csv(filePath)
+            statistics = pd.DataFrame(columns=stat_columns, index=int_columns)
+
+            for column in int_columns:
+                data = df[column]
+                min = data.min()
+                max = data.max()
+                avg = data.mean()  
+                mid = data.median()
+                std_dev = np.std(data)
+                first_quartile = data.quantile(0.25)
+                third_quartile = data.quantile(0.75)
+                percentile_95 = data.quantile(0.95)
+                lower_limit = first_quartile - 1.5 * (third_quartile - first_quartile)
+                upper_limit = third_quartile + 1.5 * (third_quartile - first_quartile)
+                data_line = {   'min': min, 
+                                'max': max, 
+                                'avg': avg, 
+                                'mid': mid, 
+                                'std_dev': std_dev,
+                                'first_quartile': first_quartile, 
+                                'third_quartile': third_quartile, 
+                                'percentile_95': percentile_95, 
+                                'lower_limit': lower_limit,
+                                'upper_limit': upper_limit
+                            } 
+                
+                statistics.loc[column] = data_line
+
+            statistics.to_csv(f"{out_folder}/{file}")
+            print(f'{file} criado')
+
+
+
+
+
+
+
+
+
+
 
 
 def main():
     #oneBoxplot()
-    NBoxplot()
+    #NBoxplot()
+    saveStatistics()
     
 
 
