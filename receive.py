@@ -35,7 +35,8 @@ class nodeCount(Packet):
 
 
 def handle_pkt(pkt):
-    pkt.show2()
+    if pkt[nodeCount].count == 2:
+        pkt.show2()
 
 
 def main():
