@@ -157,7 +157,7 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    counter(5, CounterType.packets) pqueues;
+    
 
     action drop() {
         mark_to_drop(standard_metadata);
@@ -178,13 +178,11 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
-        if (hrd.nodeCount.isValid()){
+        if (hdr.nodeCount.isValid()){
             standard_metadata.priority = (bit<3>)7;
-            pqueues.count(1);
         }
         else {
             standard_metadata.priority = (bit<3>)0;
-            pqueues.count(2);
         }
         if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
             //Se pacote INT e recirculado, envia de volta
@@ -204,6 +202,8 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
+
+    counter(5, CounterType.packets) pqueues;
 
     action my_recirculate() {
         recirculate_preserving_field_list(0);
@@ -234,6 +234,13 @@ control MyEgress(inout headers hdr,
      }
 
     apply {
+        if (standard_metadata.qid == 7){
+            pqueues.count(1);
+        } else if (standard_metadata.qid == 0){
+            pqueues.count(2);
+        }
+
+
         if (hdr.nodeCount.isValid()) {
             add_swtrace();
             /*Se pacote original, recircula*/

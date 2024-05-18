@@ -1,0 +1,9 @@
+nova instalação do p4pi
+
+v1model inalterado:
+- compilar codigo com priority -> ok
+- compilar codigo com qid -> erro/qid nao esta definido na structure standard_metadata 
+
+add qid no v1model (global)
+- compilar codigo com qid -> ok
+- subir codigo no simple_switch -> ok
