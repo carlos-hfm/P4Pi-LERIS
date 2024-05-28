@@ -7,3 +7,4 @@ v1model inalterado:
 add qid no v1model (global)
 - compilar codigo com qid -> ok
 - subir codigo no simple_switch -> ok
+- teste -> qid fica sempre em 0 no egresso, mesmo alterando o priority no ingresso

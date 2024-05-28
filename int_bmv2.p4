@@ -198,6 +198,8 @@ control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
     
+    counter(8, CounterType.packets) pqueues;
+
     action my_recirculate() {
         recirculate_preserving_field_list(0);
     }
@@ -227,6 +229,25 @@ control MyEgress(inout headers hdr,
      }
     
     apply {
+
+        if (standard_metadata.qid == 0){
+            pqueues.count(0);
+        } else if (standard_metadata.qid == 1){
+            pqueues.count(1);
+        } else if (standard_metadata.qid == 2){
+            pqueues.count(2);
+        } else if (standard_metadata.qid == 3){
+            pqueues.count(3);
+        } else if (standard_metadata.qid == 4){
+            pqueues.count(4);
+        } else if (standard_metadata.qid == 5){
+            pqueues.count(5);
+        } else if (standard_metadata.qid == 6){
+            pqueues.count(6);
+        } else if (standard_metadata.qid == 7){
+            pqueues.count(7);
+        }
+
         if (hdr.nodeCount.isValid()) {
             add_swtrace();
             /*Se pacote original, recircula*/
