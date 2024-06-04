@@ -70,7 +70,7 @@ def handle_pkt(pkt, client, database):
             else:
                 print("\n")
 
-        if pkt[NodeCount].count == 2:
+        if pkt[NodeCount].count > 0:
             point = (
                 Point("Experimentos")
                 .tag("ID", sys.argv[1]) #ID passado por argumento

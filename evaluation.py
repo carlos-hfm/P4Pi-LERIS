@@ -94,12 +94,12 @@ def main():
         compare1Ex(df, 'downlink deq_timedelta', 'uplink deq_timedelta', 'Milliseconds')
     elif len(sys.argv) == 3:
         df1 = pd.read_csv(f'INT_data/{sys.argv[1]}.csv')
-        df2 = pd.read_csv(f'INT_data/{sys.argv[2]}.csv')
+        df2 = pd.read_csv(f'INT_tests/{sys.argv[2]}.csv')
         compare2Ex(df1, df2, 'downlink deq_qdepth', 'Packets')
         compare2Ex(df1, df2, 'downlink enq_qdepth', 'Packets')
         compare2Ex(df1, df2, 'uplink enq_qdepth', 'Packets')
         compare2Ex(df1, df2, 'downlink deq_timedelta', 'Milliseconds')
-        #compare2Ex(df1, df2, 'uplink deq_timedelta', 'Milliseconds')
+        compare2Ex(df1, df2, 'uplink deq_timedelta', 'Milliseconds')
     else:
         print("Espera-se 1 ou 2 argumentos: ID(s) do(s) experimento(s)...")
 
