@@ -91,12 +91,9 @@ struct parser_metadata_t {
 }
 
 struct metadata {
-    bit<14>  flowID;
-}
-
-struct metadata {
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
+    bit<14>  flowID;
 }
 
 struct headers {
@@ -175,7 +172,7 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    
+    register<bit<14>>(5) flowIDs;
 
     action drop() {
         mark_to_drop(standard_metadata);
@@ -196,25 +193,27 @@ control MyIngress(inout headers hdr,
     }
 
     action find_flowID() {
+        bit<16> base = 1;
+        bit<32> max = 1000000;
         hash(
              meta.flowID,
-             HashAlgorithm.crc16,
-             1,
+             HashAlgorithm.crc32,
+             base,
              { 
                 hdr.ipv4.dstAddr,
                 hdr.ipv4.protocol,
                 hdr.udp.dstPort
              },
-             500
+             max
              );
     }
 
     action CG_forward() {
-        standard_metadata.priority = bit<3> = 2;
+        standard_metadata.priority = (bit<3>)2;
     }
 
     action UDP_forward() {
-        standard_metadata.priority = bit<3> = 1;
+        standard_metadata.priority = (bit<3>)1;
     }
 
     table flow_queue {
@@ -229,12 +228,22 @@ control MyIngress(inout headers hdr,
 
     apply {
        
-       if (hdr.protocol == PROTO_UDP){
+       
+       if (hdr.ipv4.protocol == PROTO_UDP){
             find_flowID();
             flow_queue.apply();
        } else {
-            standard_metadata.priority = bit<3> 0;
+            standard_metadata.priority = (bit<3>)0;
        }
+       
+       /*
+       bit<16> dstPt = 50000;
+       if (hdr.udp.isValid() && hdr.udp.dstPort == dstPt){
+            find_flowID();
+            flowIDs.write((bit<32>) 1, meta.flowID);
+       }
+       */
+       
 
 
         if (hdr.nodeCount.isValid()) {
@@ -329,6 +338,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.udp);
         packet.emit(hdr.nodeCount);
         packet.emit(hdr.INT);
     }
