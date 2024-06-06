@@ -64,7 +64,7 @@ struct parser_metadata_t {
 struct metadata {
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
-    bit<14>  flowID;
+    bit<32>  flowID;
 }
 
 struct headers {
@@ -123,54 +123,67 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    register<bit<14>>(5) flowIDs;
+    register<bit<32>>(5) flowIDs;
 
     action drop() {
         mark_to_drop(standard_metadata);
     }
 
     action find_flowID() {
-        bit<16> base = 1;
-        bit<32> max = 1000000;
+        //ip4Addr_t test_IP = 0b1010000010100000101000000001;
+        //bit<32> test_port = 80;
+        bit<1> base = 0;
+        bit<16> max = 0xffff;
+        bit<32> hash_IP;
+        bit<32> hash_port;
+
         hash(
-             meta.flowID,
-             HashAlgorithm.crc32,
+             hash_IP,
+             HashAlgorithm.crc16,
              base,
              { 
-                hdr.ipv4.dstAddr,
-                hdr.ipv4.protocol,
+                hdr.ipv4.dstAddr
+             },
+             max
+             );
+
+        hash(
+             hash_port,
+             HashAlgorithm.crc16,
+             base,
+             { 
                 hdr.udp.dstPort
              },
              max
              );
+        
+        meta.flowID = hash_IP + hash_port;
+        
+        //flowIDs.write((bit<32>) 1, hash_IP);
+        //flowIDs.write((bit<32>) 2, hash_port);
+        //flowIDs.write((bit<32>) 3, meta.flowID);
     }
 
-    action CG_forward() {
-        standard_metadata.priority = (bit<3>)2;
-    }
-
-    action UDP_forward() {
-        standard_metadata.priority = (bit<3>)1;
+    action assign_q(bit<3> qid) {
+        standard_metadata.priority = qid;
     }
 
     table flow_queue {
         key = {
             meta.flowID: exact;
+            //hdr.ipv4.protocol: exact;
         }
         actions = {
-            CG_forward;
-            UDP_forward;
+            assign_q;
         }
     }
 
     apply {
-       
-       if (hdr.ipv4.protocol == PROTO_UDP){
+
+        if (hdr.ipv4.protocol == PROTO_UDP){
             find_flowID();
             flow_queue.apply();
-       } else {
-            standard_metadata.priority = (bit<3>)0;
-       }
+        }
        
        /*
        bit<16> dstPt = 50000;
