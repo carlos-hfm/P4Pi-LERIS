@@ -123,15 +123,13 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    register<bit<32>>(5) flowIDs;
+    register<bit<3>>(0x1fffe) flow_queue;
 
     action drop() {
         mark_to_drop(standard_metadata);
     }
 
     action find_flowID() {
-        //ip4Addr_t test_IP = 0b1010000010100000101000000001;
-        //bit<32> test_port = 80;
         bit<1> base = 0;
         bit<16> max = 0xffff;
         bit<32> hash_IP;
@@ -158,40 +156,21 @@ control MyIngress(inout headers hdr,
              );
         
         meta.flowID = hash_IP + hash_port;
-        
-        //flowIDs.write((bit<32>) 1, hash_IP);
-        //flowIDs.write((bit<32>) 2, hash_port);
-        //flowIDs.write((bit<32>) 3, meta.flowID);
+
     }
 
     action assign_q(bit<3> qid) {
         standard_metadata.priority = qid;
     }
 
-    table flow_queue {
-        key = {
-            meta.flowID: exact;
-            //hdr.ipv4.protocol: exact;
-        }
-        actions = {
-            assign_q;
-        }
-    }
-
     apply {
+        bit<3> qid;
 
         if (hdr.ipv4.protocol == PROTO_UDP){
             find_flowID();
-            flow_queue.apply();
+            flow_queue.read(qid, meta.flowID);
+            assign_q(qid);
         }
-       
-       /*
-       bit<16> dstPt = 50000;
-       if (hdr.udp.isValid() && hdr.udp.dstPort == dstPt){
-            find_flowID();
-            flowIDs.write((bit<32>) 1, meta.flowID);
-       }
-       */
 
         
         standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
