@@ -2,6 +2,7 @@
 #include <core.p4>
 #include <v1model.p4>
 
+const bit<16> TYPE_IPV6 = 0x86dd;
 const bit<16> TYPE_IPV4  = 0x0800;
 const bit<8> IP_PROTO = 253;
 const bit<8> PROTO_TCP = 6;
@@ -46,6 +47,17 @@ header ipv4_t {
     ip4Addr_t dstAddr;
 }
 
+header ipv6_t {
+    bit<4>    version;
+    bit<8>    trafficClass;
+    bit<20>   flowLabel;
+    bit<16>   payloadLen;
+    bit<8>    nextHdr;
+    bit<8>    hopLimit;
+    bit<128>  srcAddr;
+    bit<128>  dstAddr;
+}
+
 header udp_t {
     bit<16> srcPort;
     bit<16> dstPort;
@@ -70,6 +82,7 @@ struct metadata {
 struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
+    ipv6_t       ipv6;
     udp_t       udp;
 }
 
@@ -86,6 +99,7 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
           TYPE_IPV4: parse_ipv4;
+          TYPE_IPV6: parse_ipv6;
           default: accept;
         }
     }
@@ -93,6 +107,14 @@ parser MyParser(packet_in packet,
     state parse_ipv4 {
       packet.extract(hdr.ipv4);
       transition select(hdr.ipv4.protocol) {
+        PROTO_UDP: parse_udp;
+        default: accept;
+      }
+    }
+
+    state parse_ipv6 {
+      packet.extract(hdr.ipv6);
+      transition select(hdr.ipv6.nextHdr) {
         PROTO_UDP: parse_udp;
         default: accept;
       }
@@ -129,7 +151,7 @@ control MyIngress(inout headers hdr,
         mark_to_drop(standard_metadata);
     }
 
-    action find_flowID() {
+    action find_flowID_ipv4() {
         bit<1> base = 0;
         bit<16> max = 0xffff;
         bit<32> hash_IP;
@@ -159,6 +181,38 @@ control MyIngress(inout headers hdr,
 
     }
 
+    action find_flowID_ipv6() {
+        bit<1> base = 0;
+        bit<16> max = 0xffff;
+        bit<32> hash_IP;
+        bit<32> hash_port;
+
+        hash(
+             hash_IP,
+             HashAlgorithm.crc16,
+             base,
+             { 
+                hdr.ipv6.dstAddr
+             },
+             max
+             );
+
+        hash(
+             hash_port,
+             HashAlgorithm.crc16,
+             base,
+             { 
+                hdr.udp.dstPort
+             },
+             max
+             );
+        
+        meta.flowID = hash_IP + hash_port;
+
+    }
+
+    
+
     action assign_q(bit<3> qid) {
         standard_metadata.priority = qid;
     }
@@ -166,13 +220,17 @@ control MyIngress(inout headers hdr,
     apply {
         bit<3> qid;
 
-        if (hdr.ipv4.protocol == PROTO_UDP){
-            find_flowID();
+        if (hdr.ipv4.isValid() && hdr.ipv4.protocol == PROTO_UDP){
+            find_flowID_ipv4();
+            flow_queue.read(qid, meta.flowID);
+            assign_q(qid);
+        } else if (hdr.ipv6.isValid() && hdr.ipv6.nextHdr == PROTO_UDP) {
+            find_flowID_ipv6();
             flow_queue.read(qid, meta.flowID);
             assign_q(qid);
         }
 
-        
+        //if (hdr.ipv4.isValid()) hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
         standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
         
 
@@ -218,6 +276,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.ipv6);
         packet.emit(hdr.udp);
     }
 }
