@@ -44,19 +44,24 @@ class INTP4Pi:
 
 
 def handle_pkt(pkt, client, database):
-    # pkt.show2()
-    #print("Packet - INT Header:")
-    if NodeCount in pkt:
+    if IP in pkt and (pkt[IP].proto == 253 or pkt[IP].proto == 254 or pkt[IP].proto == 255):
         dataINT = INTP4Pi()
+        if pkt[IP].proto == 253:
+            id = f"{sys.argv[1]}_q0"
+        elif pkt[IP].proto == 254:
+            id = f"{sys.argv[1]}_q1"
+        elif pkt[IP].proto == 255:
+            id = f"{sys.argv[1]}_q2" 
+
         for int_pkt in pkt[NodeCount].INT:
             telemetry = int_pkt[InBandNetworkTelemetry]
             if telemetry.switchID_t == 1:
-                print("Downlink - Interface WiFi")
+                print(f"{id} - Downlink - WiFi")
                 dataINT.downlink_enq_qdepth = telemetry.enq_qdepth
                 dataINT.downlink_deq_qdepth = telemetry.deq_qdepth
                 dataINT.downlink_deq_timedelta = telemetry.deq_timedelta
             else:
-                print("Uplink - Interface Cabeada")
+                print(f"{id} - Uplink - Wired")
                 dataINT.uplink_enq_qdepth = telemetry.enq_qdepth
                 dataINT.uplink_deq_qdepth = telemetry.deq_qdepth
                 dataINT.uplink_deq_timedelta = telemetry.deq_timedelta
@@ -70,10 +75,10 @@ def handle_pkt(pkt, client, database):
             else:
                 print("\n")
 
-        if pkt[NodeCount].count > 0:
+        if pkt[NodeCount].count > 0:    
             point = (
                 Point("Experimentos")
-                .tag("ID", sys.argv[1]) #ID passado por argumento
+                .tag("ID", id) #ID passado por argumento
                 .field("downlink enq_qdepth", dataINT.downlink_enq_qdepth)
                 .field("downlink deq_qdepth", dataINT.downlink_deq_qdepth)
                 .field("downlink deq_timedelta", dataINT.downlink_deq_timedelta)
@@ -101,14 +106,16 @@ def main():
         #client = 1
         database = "CG-Monitoramento"
 
-        iface = 'Wi-Fi'  # interface de entrada, alterar para Ethernet quando necessário
+        iface = 'Wi-Fi'
 
-        bind_layers(IP, NodeCount, proto=253)  # Correção na nomenclatura da classe
+        bind_layers(IP, NodeCount, proto=253)
+        bind_layers(IP, NodeCount, proto=254)
+        bind_layers(IP, NodeCount, proto=255)
         bind_layers(Ether, IP)
 
         print("Esperando pacotes...")
         timeEx = int(sys.argv[2])
-        sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database), timeout=timeEx)
+        sniff(iface=iface, prn=lambda x: handle_pkt(x, client, database), timeout=timeEx)
     else:
         print("Espera-se 2 argumentos: ID e duração (em seconds) do experimento...")    
 

@@ -35,15 +35,18 @@ class nodeCount(Packet):
 
 
 def handle_pkt(pkt):
-    if pkt[nodeCount].count > 0:
-        pkt.show2()
+    if IP in pkt and (pkt[IP].proto == 253 or pkt[IP].proto == 254 or pkt[IP].proto == 255):
+        if pkt[nodeCount].count > 0:
+            pkt.show2()
 
 
 def main():
     iface = 'Wi-Fi' #interface de entrada, alterar para Ethernet quando necessário
     bind_layers(IP, nodeCount, proto=253)
+    bind_layers(IP, nodeCount, proto=254)
+    bind_layers(IP, nodeCount, proto=255)
     print('Esperando pacotes...')
-    sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x))
+    sniff(iface=iface, prn=lambda x: handle_pkt(x))
 
 
 if __name__ == '__main__':

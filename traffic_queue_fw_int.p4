@@ -4,7 +4,9 @@
 
 const bit<16> TYPE_IPV6 = 0x86dd;
 const bit<16> TYPE_IPV4  = 0x0800;
-const bit<8> PROTO_INT = 253;
+const bit<8> PROTO_INT_0 = 253;
+const bit<8> PROTO_INT_1 = 254;
+const bit<8> PROTO_INT_2 = 255;
 const bit<8> PROTO_TCP = 6;
 const bit<8>  PROTO_UDP = 17;
 
@@ -139,7 +141,9 @@ parser MyParser(packet_in packet,
       packet.extract(hdr.ipv4);
       transition select(hdr.ipv4.protocol) {
         PROTO_UDP: parse_udp;
-        PROTO_INT: parse_count;
+        PROTO_INT_0: parse_count;
+        PROTO_INT_1: parse_count;
+        PROTO_INT_2: parse_count;
         default: accept;
       }
     }
@@ -154,7 +158,7 @@ parser MyParser(packet_in packet,
 
     state parse_udp {
         packet.extract(hdr.udp);
-        transition parse_rtp;
+        transition accept;
     }
 
     state parse_count{
@@ -284,10 +288,7 @@ control MyIngress(inout headers hdr,
     apply {
         bit<3> qid;
 
-        if (hdr.rtp.version == RTP_VERSION && hdr.rtp.padding == RTP_PADDING && hdr.rtp.extension == RTP_EXTENSION && hdr.rtp.csrcCounter == RTP_CSRC_COUNTER){
-            flow_queue.write((bit<32>)0, (bit<3>)1);
-        }
-
+        // setting queue of classified packets 
         if (hdr.ipv4.isValid() && hdr.ipv4.protocol == PROTO_UDP){
             find_flowID_ipv4();
             flow_queue.read(qid, meta.flowID);
@@ -298,8 +299,24 @@ control MyIngress(inout headers hdr,
             assign_q(qid);
         }
 
-        //if (hdr.ipv4.isValid()) hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
-        standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+        // setting queue of INT packets
+        if (hdr.ipv4.isValid()){
+            if (hdr.ipv4.protocol == PROTO_INT_1) {
+                qid = 1;
+                assign_q(qid);
+            } else if (hdr.ipv4.protocol == PROTO_INT_2) {
+                qid = 2;
+                assign_q(qid);
+            }
+        }
+
+        // forwarding 
+        if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
+            send_back();
+        } else {
+            standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+        }
+
         
 
     }
@@ -315,13 +332,51 @@ control MyEgress(inout headers hdr,
 
     counter(8, CounterType.packets) pqueues;
 
+    action my_recirculate() {
+        recirculate_preserving_field_list(0);
+    }
+
+    action add_swtrace() {
+        hdr.nodeCount.count = hdr.nodeCount.count + 1;
+        hdr.INT.push_front(1);
+        hdr.INT[0].setValid();
+        //1 para downlink, 2 para uplink
+        if (hdr.nodeCount.count == 2){
+            hdr.INT[0].swid = 1;
+        } else {
+            hdr.INT[0].swid = 2;
+        }
+        hdr.INT[0].ingress_port = (ingress_port_v)standard_metadata.ingress_port;
+        hdr.INT[0].egress_port = (egress_port_v)standard_metadata.egress_port;
+        hdr.INT[0].egress_spec = (egressSpec_v)standard_metadata.egress_spec;
+        hdr.INT[0].ingress_global_timestamp = (ingress_global_timestamp_v)standard_metadata.ingress_global_timestamp;
+        hdr.INT[0].egress_global_timestamp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
+        hdr.INT[0].enq_timestamp = (enq_timestamp_v)standard_metadata.enq_timestamp;
+        hdr.INT[0].enq_qdepth = (enq_qdepth_v)standard_metadata.enq_qdepth;
+        hdr.INT[0].deq_timedelta = (deq_timedelta_v)standard_metadata.deq_timedelta;
+        hdr.INT[0].deq_qdepth = (deq_qdepth_v)standard_metadata.deq_qdepth;
+
+        hdr.ipv4.totalLen = hdr.ipv4.totalLen + 32;
+
+     }
+
     apply {
+        
+        // counting number of pkts passed in each queue
         if (standard_metadata.qid == 0){
             pqueues.count(0);
         } else if (standard_metadata.qid == 1){
             pqueues.count(1);
         } else if (standard_metadata.qid == 2){
             pqueues.count(2);
+        }
+
+        // saving queues metadata and recirculating
+        if (hdr.nodeCount.isValid()) {
+            add_swtrace();
+            if (hdr.nodeCount.count < 2){
+                my_recirculate();
+            }
         }
     }
 }
@@ -346,7 +401,8 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv6);
         packet.emit(hdr.udp);
-        packet.emit(hdr.rtp);
+        packet.emit(hdr.nodeCount);
+        packet.emit(hdr.INT);
     }
 }
 
