@@ -2,8 +2,9 @@
 #include <core.p4>
 #include <v1model.p4>
 
+const bit<16> TYPE_IPV6 = 0x86dd;
 const bit<16> TYPE_IPV4  = 0x0800;
-const bit<8> IP_PROTO = 253;
+const bit<8> PROTO_INT = 253;
 const bit<8> PROTO_TCP = 6;
 const bit<8>  PROTO_UDP = 17;
 
@@ -24,6 +25,7 @@ const bit<8>  PROTO_UDP = 17;
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
+typedef bit<32> flowID_t;
 
 typedef bit<31> switchID_v;
 typedef bit<9> ingress_port_v;
@@ -57,6 +59,17 @@ header ipv4_t {
     ip4Addr_t dstAddr;
 }
 
+header ipv6_t {
+    bit<4>    version;
+    bit<8>    trafficClass;
+    bit<20>   flowLabel;
+    bit<16>   payloadLen;
+    bit<8>    nextHdr;
+    bit<8>    hopLimit;
+    bit<128>  srcAddr;
+    bit<128>  dstAddr;
+}
+
 header udp_t {
     bit<16> srcPort;
     bit<16> dstPort;
@@ -81,7 +94,6 @@ header InBandNetworkTelemetry_h {
     deq_qdepth_v deq_qdepth;
 }
 
-
 struct ingress_metadata_t {
     bit<16>  count;
 }
@@ -93,13 +105,14 @@ struct parser_metadata_t {
 struct metadata {
     ingress_metadata_t   ingress_metadata;
     parser_metadata_t   parser_metadata;
-    bit<14>  flowID;
+    bit<32>  flowID;
 }
 
 struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
-    udp_t       udp;
+    ipv6_t       ipv6;
+    udp_t        udp;
     nodeCount_h        nodeCount;
     InBandNetworkTelemetry_h[MAX_HOPS] INT;
 }
@@ -117,6 +130,7 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
           TYPE_IPV4: parse_ipv4;
+          TYPE_IPV6: parse_ipv6;
           default: accept;
         }
     }
@@ -124,7 +138,15 @@ parser MyParser(packet_in packet,
     state parse_ipv4 {
       packet.extract(hdr.ipv4);
       transition select(hdr.ipv4.protocol) {
-        IP_PROTO: parse_count;
+        PROTO_UDP: parse_udp;
+        PROTO_INT: parse_count;
+        default: accept;
+      }
+    }
+
+    state parse_ipv6 {
+      packet.extract(hdr.ipv6);
+      transition select(hdr.ipv6.nextHdr) {
         PROTO_UDP: parse_udp;
         default: accept;
       }
@@ -132,7 +154,7 @@ parser MyParser(packet_in packet,
 
     state parse_udp {
         packet.extract(hdr.udp);
-        transition accept;
+        transition parse_rtp;
     }
 
     state parse_count{
@@ -152,6 +174,7 @@ parser MyParser(packet_in packet,
             default: parse_int;
         }
     }
+
 }
 
 
@@ -172,7 +195,7 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    register<bit<14>>(5) flowIDs;
+    register<bit<3>>(0x1fffe) flow_queue;
 
     action drop() {
         mark_to_drop(standard_metadata);
@@ -192,66 +215,92 @@ control MyIngress(inout headers hdr,
         hdr.ipv4.dstAddr = tmp_ip;
     }
 
-    action find_flowID() {
-        bit<16> base = 1;
-        bit<32> max = 1000000;
+    action find_flowID_ipv4() {
+        bit<1> base = 0;
+        bit<16> max = 0xffff;
+        bit<32> hash_IP;
+        bit<32> hash_port;
+
         hash(
-             meta.flowID,
-             HashAlgorithm.crc32,
+             hash_IP,
+             HashAlgorithm.crc16,
              base,
              { 
-                hdr.ipv4.dstAddr,
-                hdr.ipv4.protocol,
+                hdr.ipv4.dstAddr
+             },
+             max
+             );
+
+        hash(
+             hash_port,
+             HashAlgorithm.crc16,
+             base,
+             { 
                 hdr.udp.dstPort
              },
              max
              );
+        
+        meta.flowID = hash_IP + hash_port;
+
     }
 
-    action CG_forward() {
-        standard_metadata.priority = (bit<3>)2;
+    action find_flowID_ipv6() {
+        bit<1> base = 0;
+        bit<16> max = 0xffff;
+        bit<32> hash_IP;
+        bit<32> hash_port;
+
+        hash(
+             hash_IP,
+             HashAlgorithm.crc16,
+             base,
+             { 
+                hdr.ipv6.dstAddr
+             },
+             max
+             );
+
+        hash(
+             hash_port,
+             HashAlgorithm.crc16,
+             base,
+             { 
+                hdr.udp.dstPort
+             },
+             max
+             );
+        
+        meta.flowID = hash_IP + hash_port;
+
     }
 
-    action UDP_forward() {
-        standard_metadata.priority = (bit<3>)1;
-    }
+    
 
-    table flow_queue {
-        key = {
-            meta.flowID: exact;
-        }
-        actions = {
-            CG_forward;
-            UDP_forward;
-        }
+    action assign_q(bit<3> qid) {
+        standard_metadata.priority = qid;
     }
 
     apply {
-       
-       
-       if (hdr.ipv4.protocol == PROTO_UDP){
-            find_flowID();
-            flow_queue.apply();
-       } else {
-            standard_metadata.priority = (bit<3>)0;
-       }
-       
-       /*
-       bit<16> dstPt = 50000;
-       if (hdr.udp.isValid() && hdr.udp.dstPort == dstPt){
-            find_flowID();
-            flowIDs.write((bit<32>) 1, meta.flowID);
-       }
-       */
-       
+        bit<3> qid;
 
-
-        if (hdr.nodeCount.isValid()) {
-            send_back();
-        } else {
-            /*Se pacote normal ou sem INT, faz o roteamento normal*/
-            standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+        if (hdr.rtp.version == RTP_VERSION && hdr.rtp.padding == RTP_PADDING && hdr.rtp.extension == RTP_EXTENSION && hdr.rtp.csrcCounter == RTP_CSRC_COUNTER){
+            flow_queue.write((bit<32>)0, (bit<3>)1);
         }
+
+        if (hdr.ipv4.isValid() && hdr.ipv4.protocol == PROTO_UDP){
+            find_flowID_ipv4();
+            flow_queue.read(qid, meta.flowID);
+            assign_q(qid);
+        } else if (hdr.ipv6.isValid() && hdr.ipv6.nextHdr == PROTO_UDP) {
+            find_flowID_ipv6();
+            flow_queue.read(qid, meta.flowID);
+            assign_q(qid);
+        }
+
+        //if (hdr.ipv4.isValid()) hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+        standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
+        
 
     }
 }
@@ -266,34 +315,6 @@ control MyEgress(inout headers hdr,
 
     counter(8, CounterType.packets) pqueues;
 
-    action my_recirculate() {
-        recirculate_preserving_field_list(0);
-    }
-
-    action add_swtrace() {
-        hdr.nodeCount.count = hdr.nodeCount.count + 1;
-        hdr.INT.push_front(1);
-        hdr.INT[0].setValid();
-        //1 para downlink, 2 para uplink
-        if (hdr.nodeCount.count == 2){
-            hdr.INT[0].swid = 1;
-        } else {
-            hdr.INT[0].swid = 2;
-        }
-        hdr.INT[0].ingress_port = (ingress_port_v)standard_metadata.ingress_port;
-        hdr.INT[0].egress_port = (egress_port_v)standard_metadata.egress_port;
-        hdr.INT[0].egress_spec = (egressSpec_v)standard_metadata.egress_spec;
-        hdr.INT[0].ingress_global_timestamp = (ingress_global_timestamp_v)standard_metadata.ingress_global_timestamp;
-        hdr.INT[0].egress_global_timestamp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
-        hdr.INT[0].enq_timestamp = (enq_timestamp_v)standard_metadata.enq_timestamp;
-        hdr.INT[0].enq_qdepth = (enq_qdepth_v)standard_metadata.enq_qdepth;
-        hdr.INT[0].deq_timedelta = (deq_timedelta_v)standard_metadata.deq_timedelta;
-        hdr.INT[0].deq_qdepth = (deq_qdepth_v)standard_metadata.deq_qdepth;
-
-        hdr.ipv4.totalLen = hdr.ipv4.totalLen + 32;
-
-     }
-
     apply {
         if (standard_metadata.qid == 0){
             pqueues.count(0);
@@ -301,23 +322,8 @@ control MyEgress(inout headers hdr,
             pqueues.count(1);
         } else if (standard_metadata.qid == 2){
             pqueues.count(2);
-        } else if (standard_metadata.qid == 3){
-            pqueues.count(3);
-        } else if (standard_metadata.qid == 4){
-            pqueues.count(4);
-        } else if (standard_metadata.qid == 5){
-            pqueues.count(5);
-        } else if (standard_metadata.qid == 6){
-            pqueues.count(6);
-        } else if (standard_metadata.qid == 7){
-            pqueues.count(7);
         }
-
-
-        if (hdr.nodeCount.isValid()) {
-            add_swtrace();
-        }
-      }
+    }
 }
 
 /*************************************************************************
@@ -338,9 +344,9 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.ipv6);
         packet.emit(hdr.udp);
-        packet.emit(hdr.nodeCount);
-        packet.emit(hdr.INT);
+        packet.emit(hdr.rtp);
     }
 }
 

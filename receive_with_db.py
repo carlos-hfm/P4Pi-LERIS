@@ -108,9 +108,9 @@ def main():
 
         print("Esperando pacotes...")
         timeEx = int(sys.argv[2])
-        sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database), timeout=timeEx * 60)
+        sniff(filter="ip proto 253", iface=iface, prn=lambda x: handle_pkt(x, client, database), timeout=timeEx)
     else:
-        print("Espera-se 2 argumentos: ID e duração (em minutos) do experimento...")
+        print("Espera-se 2 argumentos: ID e duração (em seconds) do experimento...")    
 
 
 if __name__ == '__main__':

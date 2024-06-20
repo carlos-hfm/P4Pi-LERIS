@@ -7,6 +7,10 @@ const bit<16> TYPE_IPV4  = 0x0800;
 const bit<8> IP_PROTO = 253;
 const bit<8> PROTO_TCP = 6;
 const bit<8>  PROTO_UDP = 17;
+const bit<2>  RTP_VERSION = 2;
+const bit<1>  RTP_PADDING = 0;
+const bit<1>  RTP_EXTENSION = 1;
+const bit<4>  RTP_CSRC_COUNTER = 0;
 
 
 #define PKT_INSTANCE_TYPE_NORMAL 0
@@ -25,6 +29,7 @@ const bit<8>  PROTO_UDP = 17;
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
+typedef bit<32> flowID_t;
 
 header ethernet_t {
     macAddr_t dstAddr;
@@ -65,6 +70,20 @@ header udp_t {
     bit<16> checksum;
 }
 
+header rtp_t {
+    bit<2> version;
+    bit<1> padding;
+    bit<1> extension;
+    bit<4> csrcCounter;
+    bit<1> marker;
+    bit<7> payloadType;
+    bit<16> seqNumber;
+    bit<32> timestamp;
+    bit<32> ssrcID;
+    bit<16> csrcID;
+
+}
+
 struct ingress_metadata_t {
     bit<16>  count;
 }
@@ -83,7 +102,8 @@ struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
     ipv6_t       ipv6;
-    udp_t       udp;
+    udp_t        udp;
+    rtp_t        rtp;
 }
 
 /*************************************************************************
@@ -122,6 +142,11 @@ parser MyParser(packet_in packet,
 
     state parse_udp {
         packet.extract(hdr.udp);
+        transition parse_rtp;
+    }
+
+    state parse_rtp {
+        packet.extract(hdr.rtp);
         transition accept;
     }
 
@@ -220,6 +245,10 @@ control MyIngress(inout headers hdr,
     apply {
         bit<3> qid;
 
+        if (hdr.rtp.version == RTP_VERSION && hdr.rtp.padding == RTP_PADDING && hdr.rtp.extension == RTP_EXTENSION && hdr.rtp.csrcCounter == RTP_CSRC_COUNTER){
+            flow_queue.write((bit<32>)0, (bit<3>)1);
+        }
+
         if (hdr.ipv4.isValid() && hdr.ipv4.protocol == PROTO_UDP){
             find_flowID_ipv4();
             flow_queue.read(qid, meta.flowID);
@@ -278,6 +307,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv6);
         packet.emit(hdr.udp);
+        packet.emit(hdr.rtp);
     }
 }
 

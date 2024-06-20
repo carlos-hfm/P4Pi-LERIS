@@ -155,8 +155,6 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
-    
-    counter(5, CounterType.packets) sendingBackPkts;
 
     action drop() {
         mark_to_drop(standard_metadata);
@@ -180,11 +178,9 @@ control MyIngress(inout headers hdr,
         if (hdr.nodeCount.isValid() && standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_RECIRC) {
             //Se pacote INT e recirculado, envia de volta
             send_back();
-            sendingBackPkts.count(1);
         } else {
-            /*Se pacote normal ou sem INT, faz o roteamento normal*/
+            /*Se pacote normal ou sem INT, faz o encaminhamento normal*/
             standard_metadata.egress_spec = (standard_metadata.ingress_port+1)%2;
-            sendingBackPkts.count(2);
         }
         
     }
@@ -197,8 +193,6 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
-    
-    counter(8, CounterType.packets) pqueues;
 
     action my_recirculate() {
         recirculate_preserving_field_list(0);
@@ -230,23 +224,6 @@ control MyEgress(inout headers hdr,
     
     apply {
 
-        if (standard_metadata.qid == 0){
-            pqueues.count(0);
-        } else if (standard_metadata.qid == 1){
-            pqueues.count(1);
-        } else if (standard_metadata.qid == 2){
-            pqueues.count(2);
-        } else if (standard_metadata.qid == 3){
-            pqueues.count(3);
-        } else if (standard_metadata.qid == 4){
-            pqueues.count(4);
-        } else if (standard_metadata.qid == 5){
-            pqueues.count(5);
-        } else if (standard_metadata.qid == 6){
-            pqueues.count(6);
-        } else if (standard_metadata.qid == 7){
-            pqueues.count(7);
-        }
 
         if (hdr.nodeCount.isValid()) {
             add_swtrace();
