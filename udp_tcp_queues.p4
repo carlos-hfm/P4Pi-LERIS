@@ -34,6 +34,8 @@ typedef bit<31> switchID_v;
 typedef bit<9> ingress_port_v;
 typedef bit<9> egress_port_v;
 typedef bit<9>  egressSpec_v;
+typedef bit<3>  priority_v;
+typedef bit<5>  qid_v;
 typedef bit<48>  ingress_global_timestamp_v;
 typedef bit<48>  egress_global_timestamp_v;
 typedef bit<32>  enq_timestamp_v;
@@ -89,6 +91,8 @@ header InBandNetworkTelemetry_h {
     ingress_port_v ingress_port;
     egress_port_v egress_port;
     egressSpec_v egress_spec;
+    priority_v priority;
+    qid_v qid;
     ingress_global_timestamp_v ingress_global_timestamp;
     egress_global_timestamp_v egress_global_timestamp;
     enq_timestamp_v enq_timestamp;
@@ -232,7 +236,7 @@ control MyIngress(inout headers hdr,
         if (hdr.ipv4.protocol == PROTO_TCP) {
             qid = 0;
             assign_q(qid);
-        } else if (hdr.ipv4.protocol == 100 && standard_metadata.ingress_port == 10) {
+        } else if (hdr.ipv4.protocol == PROTO_UDP) {
             qid = 1;
             assign_q(qid);
         }
@@ -294,6 +298,8 @@ control MyEgress(inout headers hdr,
         hdr.INT[0].ingress_port = (ingress_port_v)standard_metadata.ingress_port;
         hdr.INT[0].egress_port = (egress_port_v)standard_metadata.egress_port;
         hdr.INT[0].egress_spec = (egressSpec_v)standard_metadata.egress_spec;
+        hdr.INT[0].priority = (priority_v)standard_metadata.priority;
+        hdr.INT[0].qid = (qid_v)standard_metadata.qid;
         hdr.INT[0].ingress_global_timestamp = (ingress_global_timestamp_v)standard_metadata.ingress_global_timestamp;
         hdr.INT[0].egress_global_timestamp = (egress_global_timestamp_v)standard_metadata.egress_global_timestamp;
         hdr.INT[0].enq_timestamp = (enq_timestamp_v)standard_metadata.enq_timestamp;
@@ -302,7 +308,7 @@ control MyEgress(inout headers hdr,
         hdr.INT[0].deq_qdepth = (deq_qdepth_v)standard_metadata.deq_qdepth;
         
 
-        hdr.ipv4.totalLen = hdr.ipv4.totalLen + 32;
+        hdr.ipv4.totalLen = hdr.ipv4.totalLen + 40;
 
      }
 

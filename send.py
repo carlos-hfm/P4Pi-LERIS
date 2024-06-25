@@ -12,9 +12,11 @@ from scapy.all import Packet, bind_layers, BitField, ShortField, IntField, XByte
 
 class InBandNetworkTelemetry(Packet):
     fields_desc = [ BitField("switchID_t", 0, 31),
-                    BitField("ingress_port",0, 9),
-                    BitField("egress_port",0, 9),
+                    BitField("ingress_port", 0, 9),
+                    BitField("egress_port", 0, 9),
                     BitField("egress_spec", 0, 9),
+                    BitField("priority", 0, 3),
+                    BitField("qid", 0, 5),
                     BitField("ingress_global_timestamp", 0, 48),
                     BitField("egress_global_timestamp", 0, 48),
                     BitField("enq_timestamp",0, 32),
@@ -34,7 +36,7 @@ def main():
 
     #addr = socket.gethostbyname(sys.argv[1])
     #IP e MAC de destino da maquina do lab
-    dstIP = '10.10.10.2' #inserido na maquina na mão
+    dstIP = '10.10.10.1' #inserido na maquina na mão
     dstMAC = "e0:69:95:72:c8:41"
     iface = 'Wi-Fi'
 

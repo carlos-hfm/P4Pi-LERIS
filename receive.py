@@ -15,6 +15,8 @@ class InBandNetworkTelemetry(Packet):
                    BitField("ingress_port", 0, 9),
                    BitField("egress_port", 0, 9),
                    BitField("egress_spec", 0, 9),
+                   BitField("priority", 0, 3),
+                   BitField("qid", 0, 5),
                    BitField("ingress_global_timestamp", 0, 48),
                    BitField("egress_global_timestamp", 0, 48),
                    BitField("enq_timestamp", 0, 32),
