@@ -198,7 +198,7 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    register<bit<3>>(0x1fffe) flow_queue;
+    //register<bit<3>>(0x1fffe) flow_queue;
     counter(8, CounterType.packets) int_pkts;
 
     action drop() {
@@ -219,65 +219,6 @@ control MyIngress(inout headers hdr,
         hdr.ipv4.dstAddr = tmp_ip;
     }
 
-    action find_flowID_ipv4() {
-        bit<1> base = 0;
-        bit<16> max = 0xffff;
-        bit<32> hash_IP;
-        bit<32> hash_port;
-
-        hash(
-             hash_IP,
-             HashAlgorithm.crc16,
-             base,
-             { 
-                hdr.ipv4.dstAddr
-             },
-             max
-             );
-
-        hash(
-             hash_port,
-             HashAlgorithm.crc16,
-             base,
-             { 
-                hdr.udp.dstPort
-             },
-             max
-             );
-        
-        meta.flowID = hash_IP + hash_port;
-
-    }
-
-    action find_flowID_ipv6() {
-        bit<1> base = 0;
-        bit<16> max = 0xffff;
-        bit<32> hash_IP;
-        bit<32> hash_port;
-
-        hash(
-             hash_IP,
-             HashAlgorithm.crc16,
-             base,
-             { 
-                hdr.ipv6.dstAddr
-             },
-             max
-             );
-
-        hash(
-             hash_port,
-             HashAlgorithm.crc16,
-             base,
-             { 
-                hdr.udp.dstPort
-             },
-             max
-             );
-        
-        meta.flowID = hash_IP + hash_port;
-
-    }
 
     
 
@@ -288,14 +229,11 @@ control MyIngress(inout headers hdr,
     apply {
         bit<3> qid;
 
-        // setting queue of classified packets 
-        if (hdr.ipv4.isValid() && hdr.ipv4.protocol == PROTO_UDP){
-            find_flowID_ipv4();
-            flow_queue.read(qid, meta.flowID);
+        if (hdr.ipv4.protocol == PROTO_TCP) {
+            qid = 0;
             assign_q(qid);
-        } else if (hdr.ipv6.isValid() && hdr.ipv6.nextHdr == PROTO_UDP) {
-            find_flowID_ipv6();
-            flow_queue.read(qid, meta.flowID);
+        } else if (hdr.ipv4.protocol == 100 && standard_metadata.ingress_port == 10) {
+            qid = 1;
             assign_q(qid);
         }
 
@@ -303,8 +241,10 @@ control MyIngress(inout headers hdr,
         if (hdr.nodeCount.isValid()){
             if (hdr.ipv4.dstAddr == IP_INT_0) {
                 int_pkts.count(0);
+                qid = 0;
+                assign_q(qid);
             }
-            if (hdr.ipv4.dstAddr == IP_INT_1) {
+            if (hdr.ipv4.dstAddr == IP_INT_1) { 
                 int_pkts.count(1);
                 qid = 1;
                 assign_q(qid);

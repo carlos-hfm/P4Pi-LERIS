@@ -32,23 +32,23 @@ class nodeCount(Packet):
 
 def main():
 
-    #addr = socket.gethostbyname(sys.argv[1])
-    #IP e MAC de destino da maquina do lab
-    dstIP = '192.168.4.25' #inserido na maquina na mão
+    dstIP0 = '10.10.10.1'
+    dstIP1 = '10.10.10.2' 
+    dstIP2 = '10.10.10.3'  
     dstMAC = "e0:69:95:72:c8:41"
     iface = 'Wi-Fi'
 
     bind_layers(IP, nodeCount, proto = 253)
     pkt0 = Ether(src=get_if_hwaddr(iface), dst=dstMAC) / IP(
-        dst=dstIP, proto=253) / nodeCount(count=0, INT=[])
+        dst=dstIP0, proto=253) / nodeCount(count=0, INT=[])
     
-    bind_layers(IP, nodeCount, proto = 254)
+    #bind_layers(IP, nodeCount, proto = 254)
     pkt1 = Ether(src=get_if_hwaddr(iface), dst=dstMAC) / IP(
-        dst=dstIP, proto=254) / nodeCount(count=0, INT=[])
+        dst=dstIP1, proto=253) / nodeCount(count=0, INT=[])
     
-    bind_layers(IP, nodeCount, proto = 255)
+    #bind_layers(IP, nodeCount, proto = 255)
     pkt2 = Ether(src=get_if_hwaddr(iface), dst=dstMAC) / IP(
-        dst=dstIP, proto=255) / nodeCount(count=0, INT=[])
+        dst=dstIP2, proto=253) / nodeCount(count=0, INT=[])
 
     while True:
         sendp(pkt0, iface=iface)

@@ -15,14 +15,14 @@ def connectDB():
 
 def main():
     client = connectDB()
-    folder = 'INT_tests'
+    folder = '../scenarios'
     
     if len(sys.argv) == 2:
         query = f"""
                     SELECT *
                     FROM "Experimentos"
                     WHERE
-                    "ID" IN ('{sys.argv[1]}')
+                    "ID" IN ('{sys.argv[1]}') and time >= now() - interval '24 hour'
                 """
 
         data = client.query(query=query, language="sql")

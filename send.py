@@ -34,7 +34,7 @@ def main():
 
     #addr = socket.gethostbyname(sys.argv[1])
     #IP e MAC de destino da maquina do lab
-    dstIP = '192.168.4.25' #inserido na maquina na mão
+    dstIP = '10.10.10.2' #inserido na maquina na mão
     dstMAC = "e0:69:95:72:c8:41"
     iface = 'Wi-Fi'
 

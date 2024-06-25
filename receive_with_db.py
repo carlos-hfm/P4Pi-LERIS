@@ -46,11 +46,11 @@ class INTP4Pi:
 def handle_pkt(pkt, client, database):
     if IP in pkt and (pkt[IP].proto == 253 or pkt[IP].proto == 254 or pkt[IP].proto == 255):
         dataINT = INTP4Pi()
-        if pkt[IP].proto == 253:
+        if pkt[IP].src == '10.10.10.1':
             id = f"{sys.argv[1]}_q0"
-        elif pkt[IP].proto == 254:
+        elif pkt[IP].src == '10.10.10.2':
             id = f"{sys.argv[1]}_q1"
-        elif pkt[IP].proto == 255:
+        elif pkt[IP].src == '10.10.10.3':
             id = f"{sys.argv[1]}_q2" 
 
         for int_pkt in pkt[NodeCount].INT:
