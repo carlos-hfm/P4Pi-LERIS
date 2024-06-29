@@ -55,11 +55,14 @@ def main():
     while True:
         sendp(pkt0, iface=iface)
         pkt0.show2()
+        sleep(0.33)
         sendp(pkt1, iface=iface)
         pkt1.show2()
+        sleep(0.33)
         sendp(pkt2, iface=iface)
         pkt2.show2()
-        sleep(1)
+        sleep(0.33)
+        #sleep(1)
 
 if __name__ == '__main__':
     main()
